@@ -1,0 +1,101 @@
+from python import Python as py
+from python.object import PythonObject
+from tensor import Tensor, TensorSpec
+from collections import List
+from utils import Index
+from math import max, round
+import time
+
+fn main() raises -> None:
+    var start = time.now()
+    knapsack_algo()
+    var end = time.now()
+    print("Calc duration: ", (end - start)/1000000000, " seconds.")
+
+
+fn knapsack_algo() raises -> None:
+    var np = py.import_module("numpy")
+    var pd = py.import_module("pandas")
+    var df = pd.read_csv("data.csv").sort_values(['profit'])
+    var name_col = np.flip(np.array(df['name']))
+    var price_col = np.flip(np.array(df['price'], np.float32))
+    var profit_col = np.flip(np.array(df['profit'], np.float32))
+    var earnings_col = price_col * (profit_col / 100)
+    var budget: Int = 500
+    var precision_factor: Int = 1000
+    # TODO precision factor of 1000 gets identical results, but precision factor 100 gets incredibly fast results, what to do about this?
+    var rmb: Int = budget * precision_factor
+    var n_items: Int = int(np.shape(name_col)[0])
+    
+    # Mojofy the data
+    var price_col_mojo = Tensor[DType.int64](n_items)
+    var profit_col_mojo = Tensor[DType.int64](n_items)
+    var earnings_col_mojo = Tensor[DType.int64](n_items)
+    for i in range(n_items):
+        var float_price: Float64 = price_col[i].to_float64()
+        var float_profit: Float64 = profit_col[i].to_float64()
+        var float_earnings: Float64 = earnings_col[i].to_float64()
+        price_col_mojo[i] = int(float_price * precision_factor)
+        profit_col_mojo[i] = int(float_profit * precision_factor)
+        earnings_col_mojo[i] = int(float_earnings * precision_factor)
+    
+    # Get the best combination possible
+    var combination_matrix = check_all_combinations(price_col_mojo, earnings_col_mojo, rmb, n_items)
+    var final_result: Int64 = combination_matrix[Index(n_items, rmb)]
+
+    # Reconstruct the data
+    var prices = List[Int64](30)
+    var amounts_earned = List[Int64](30)
+    var current_capacity: Int64 = rmb
+    var current_index: Int = n_items
+    var nb_iterations: Int = 0
+    while current_index > 0 and current_capacity > 0:
+        if combination_matrix[Index(current_index, current_capacity)] != combination_matrix[Index(current_index-1, current_capacity)]:
+            if price_col_mojo[current_index-1] <= current_capacity:
+                prices.append(price_col_mojo[current_index-1])
+                amounts_earned.append(earnings_col_mojo[current_index-1])
+                current_capacity -= price_col_mojo[current_index-1]
+                nb_iterations += 1
+        current_index -=  1
+    
+    var chosen_items: PythonObject = []
+    var total_earned: Float64 = 0.0
+    var total_spent: Float64 = 0.0
+    for i in range(prices.__len__()):
+        for j in range(n_items):
+            if prices[i] == price_col_mojo[j] and amounts_earned[i] == earnings_col_mojo[j]:
+                var item_name: String = name_col[j]
+                var item_price: Float64 = price_col_mojo[j].to_int() / precision_factor
+                var item_earnings: Float64 = earnings_col_mojo[j].to_int() / precision_factor
+                total_earned += item_earnings
+                total_spent += item_price
+                var chosen_item = ChosenItem(item_name, item_price, item_earnings)
+                var res = chosen_items.append(chosen_item.stringify())
+    print("Spent: ", total_spent, ", Earned: ", total_earned, ", Chosen stocks: ", chosen_items)
+
+fn check_all_combinations(weights: Tensor[DType.int64], values: Tensor[DType.int64], capacity: Int, n: Int) raises -> Tensor[DType.int64]:
+    var combination_matrix = Tensor[DType.int64](n+1, capacity+1)
+    for i in range(1, n+1):
+        for w in range(1, capacity+1):
+            if weights[i-1] <= w:
+                combination_matrix[Index(i, w)] = max(combination_matrix[Index(i-1, w)], values[i-1] + combination_matrix[Index(i-1, w-weights[i-1])])
+            else:
+                combination_matrix[Index(i, w)] = combination_matrix[Index(i-1, w)]
+    return combination_matrix
+
+
+struct ChosenItem:
+    var name: String
+    var price: Float64
+    var earnings: Float64
+
+    fn __init__(inout self, name: String, price: Float64, earnings: Float64):
+        self.name = name
+        self.price = price
+        self.earnings = earnings
+
+    fn dump(self):
+        print(self.name, self.price, self.earnings)
+    
+    fn stringify(self) -> String:
+        return "Name: " + self.name + ", Price: " + str(self.price) + ", Earnings: " + str(self.earnings)
