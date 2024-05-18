@@ -17,7 +17,7 @@ Compare Mojo and Python knapsack performance
 ### Installation
 ##### Clone the source directly from Github:
 ```sh
-$ git clone https://github.com/harrisafoster/ReactMojo.git
+$ git clone https://github.com/harrisafoster/mojo_knapsack.git
 $ cd ReactMojo
 ```
 ##### Create & activate your Python virtual environment:
