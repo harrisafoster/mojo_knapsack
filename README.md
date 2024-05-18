@@ -1,12 +1,10 @@
-# ReactMojo
+# MojoKnapsack
 
 ## Goal
 
 Goal:
 
-Create functional Mojo API
-
-Interface with React/JS to create the API interface & front end
+Compare Mojo and Python knapsack performance
 
 ## Local Dev
 
